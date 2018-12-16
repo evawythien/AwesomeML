@@ -1,83 +1,124 @@
-/* This template shows the building blocks for training a machine learning model with ML.NET (https://aka.ms/mlnet).
- * This model predicts whether a sentence has a positive or negative sentiment. It is based on a sample that can be 
- * found at https://aka.ms/mlnetsentimentanalysis, which provides a more detailed introduction to ML.NET and the scenario. */
-
 using System;
 using System.IO;
+using Microsoft.ML.Runtime.Learners;
 using Microsoft.ML.Runtime.Data;
+using Microsoft.ML.Core.Data;
 using Microsoft.ML;
-using Microsoft.ML.Runtime.Api;
+using Microsoft.ML.Trainers;
+
 using Microsoft.ML.Transforms.Text;
+using System.Data;
+using System.Data.Common;
+using AwesomeMachineLearning.DataStructures;
+using AwesomeMachineLearning.Common;
 
 namespace AwesomeMachineLearning
 {
-    class Program
+    internal static class Program
     {
-        static void Main()
+        private static string AppPath => Path.GetDirectoryName(Environment.GetCommandLineArgs()[0]);
+
+        private static string BaseDatasetsLocation = @"../../../../Data";
+        private static string TrainDataPath = $"{BaseDatasetsLocation}/wikipedia-detox-250-line-data.tsv";
+        private static string TestDataPath = $"{BaseDatasetsLocation}/wikipedia-detox-250-line-test.tsv";
+
+        private static string BaseModelsPath = @"../../../../MLModels";
+        private static string ModelPath = $"{BaseModelsPath}/SentimentModel.zip";
+
+        static void Main(string[] args)
         {
-            // 1. Build an ML.NET pipeline for training a sentiment analysis model.
-            Console.WriteLine("Training a model for Sentiment Analysis using ML.NET");
-            var mlContext = new MLContext();
+            //Create MLContext to be shared across the model creation workflow objects 
+            //Set a random seed for repeatable/deterministic results across multiple trainings.
+            var mlContext = new MLContext(seed: 1);
 
-            // 1a. Load the training data using a TextLoader.
-            var reader = mlContext.Data.TextReader(
-                new[]
-                    {
-                        new TextLoader.Column("Label", DataKind.Bool, 0),
-                        new TextLoader.Column("Text", DataKind.Text, 1)
-                    },
-                options => { options.Separator = "tab"; options.HasHeader = true; });
-            IDataView trainingDataView = reader.Read(@"Data\wikipedia-detox-250-line-data.tsv");
+            // Create, Train, Evaluate and Save a model
+            BuildTrainEvaluateAndSaveModel(mlContext);
+            Common.ConsoleHelper.ConsoleWriteHeader("=============== End of training processh ===============");
 
-            // 2. Create a pipeline to prepare your data, pick your features and apply a machine learning algorithm.
-            // 2a. Featurize the text into a numeric vector that can be used by the machine learning algorithm.
-            var pipeline = mlContext.Transforms.Text.FeaturizeText("Text", "Features")
-                    .Append(mlContext.BinaryClassification.Trainers.StochasticDualCoordinateAscent( "Label", "Features"));
+            // Make a single test prediction loding the model from .ZIP file
+            TestSinglePrediction(mlContext);
 
-            // 3. Get a model by training the pipeline that was built.
-            var model = pipeline.Fit(trainingDataView);
+            Common.ConsoleHelper.ConsoleWriteHeader("=============== End of process, hit any key to finish ===============");
+            Console.ReadKey();
 
-            // 4. Evaluate the model to see how well it performs on different data (output the percent of examples classified correctly).
-            Console.WriteLine("Training of model is complete \nTesting the model with test data");
-            IDataView testDataView = reader.Read(@"Data\wikipedia-detox-250-line-test.tsv");
-            var predictions = model.Transform(testDataView);
-            var results = mlContext.BinaryClassification.Evaluate(predictions);
-            Console.WriteLine($"Accuracy: {results.Accuracy:P2}");
-
-            // 5. Use the model for a single prediction.
-            var predictionFunct = model.MakePredictionFunction<SentimentData, SentimentPrediction>(mlContext);
-            var testInput = new SentimentData { Text = "ML.NET is fun, more samples at https://github.com/dotnet/machinelearning-samples" };
-            SentimentPrediction resultprediction = predictionFunct.Predict(testInput);
-
-            /* This template uses a minimal dataset to build a sentiment analysis model which leads to relatively low accuracy. 
-             * Building good Machine Learning models require large volumes of data. This template comes with a minimal dataset (Data/wikipedia-detox) for sentiment analysis. 
-             * In order to build a sentiment analysis model with higher accuracy please follow the walkthrough at https://aka.ms/mlnetsentimentanalysis/. */
-            Console.WriteLine($"Predicted sentiment for \"{testInput.Text}\" is: { (Convert.ToBoolean(resultprediction.Prediction) ? "Positive" : "Negative")}");
-
-            // 6. Save the model to file so it can be used in another app.
-            Console.WriteLine("Saving the model");
-            var fs = new FileStream("sentiment_model.zip", FileMode.Create, FileAccess.Write, FileShare.Write);
-            model.SaveTo(mlContext, fs);
-
-            Console.ReadLine();
         }
 
-        /// <summary>
-        /// Input class that tells ML.NET how to read the dataset.
-        /// </summary>
-        public class SentimentData
+        private static ITransformer BuildTrainEvaluateAndSaveModel(MLContext mlContext)
         {
-            public bool Label { get; set; }
-            public string Text { get; set; }
+            // STEP 1: Common data loading configuration
+            TextLoader textLoader = mlContext.Data.TextReader(new TextLoader.Arguments()
+            {
+                Separator = "tab",
+                HasHeader = true,
+                Column = new[]
+                                                                    {
+                                                                    new TextLoader.Column("Label", DataKind.Bool, 0),
+                                                                    new TextLoader.Column("Text", DataKind.Text, 1)
+                                                                    }
+            });
+
+            IDataView trainingDataView = textLoader.Read(TrainDataPath);
+            IDataView testDataView = textLoader.Read(TestDataPath);
+
+            // STEP 2: Common data process configuration with pipeline data transformations          
+            var dataProcessPipeline = mlContext.Transforms.Text.FeaturizeText("Text", "Features");
+
+            // (OPTIONAL) Peek data (such as 2 records) in training DataView after applying the ProcessPipeline's transformations into "Features" 
+            ConsoleHelper.PeekDataViewInConsole<SentimentIssue>(mlContext, trainingDataView, dataProcessPipeline, 2);
+            ConsoleHelper.PeekVectorColumnDataInConsole(mlContext, "Features", trainingDataView, dataProcessPipeline, 1);
+
+            // STEP 3: Set the training algorithm, then create and config the modelBuilder                            
+            var trainer = mlContext.BinaryClassification.Trainers.FastTree(labelColumn: "Label", featureColumn: "Features");
+            var trainingPipeline = dataProcessPipeline.Append(trainer);
+
+            // STEP 4: Train the model fitting to the DataSet
+            Console.WriteLine("=============== Training the model ===============");
+            ITransformer trainedModel = trainingPipeline.Fit(trainingDataView);
+
+            // STEP 5: Evaluate the model and show accuracy stats
+            Console.WriteLine("===== Evaluating Model's accuracy with Test data =====");
+            var predictions = trainedModel.Transform(testDataView);
+            var metrics = mlContext.BinaryClassification.Evaluate(predictions, "Label", "Score");
+
+            ConsoleHelper.PrintBinaryClassificationMetrics(trainer.ToString(), metrics);
+
+            // STEP 6: Save/persist the trained model to a .ZIP file
+
+            using (var fs = new FileStream(ModelPath, FileMode.Create, FileAccess.Write, FileShare.Write))
+                mlContext.Model.Save(trainedModel, fs);
+
+            Console.WriteLine("The model is saved to {0}", ModelPath);
+
+            return trainedModel;
         }
 
-        /// <summary>
-        /// Output class for the prediction, in this case including only the predicted sentiment.
-        /// </summary>
-        public class SentimentPrediction
+        // (OPTIONAL) Try/test a single prediction by loding the model from the file, first.
+        private static void TestSinglePrediction(MLContext mlContext)
         {
-            [ColumnName("PredictedLabel")]
-            public bool Prediction { get; set; }
+
+            SentimentIssue sampleStatement = new SentimentIssue { Text = "This is a very rude movie" };
+
+            ITransformer trainedModel;
+            using (var stream = new FileStream(ModelPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                trainedModel = mlContext.Model.Load(stream);
+            }
+
+            // Create prediction engine related to the loaded trained model
+            var predFunction = trainedModel.MakePredictionFunction<SentimentIssue, SentimentPrediction>(mlContext);
+
+            //Score
+            var resultprediction = predFunction.Predict(sampleStatement);
+
+            // Using a Model Scorer helper class --> 3 lines, including the object creation, and a single object to deal with
+            // var modelScorer = new ModelScorer<SentimentIssue, SentimentPrediction>(mlContext);
+            // modelScorer.LoadModelFromZipFile(ModelPath);
+            // var resultprediction = modelScorer.PredictSingle(sampleStatement);
+
+            Console.WriteLine($"=============== Single Prediction  ===============");
+            Console.WriteLine($"Text: {sampleStatement.Text} | Prediction: {(Convert.ToBoolean(resultprediction.Prediction) ? "Toxic" : "Nice")} sentiment | Probability: {resultprediction.Probability} ");
+            Console.WriteLine($"==================================================");
+            //
         }
     }
 }
