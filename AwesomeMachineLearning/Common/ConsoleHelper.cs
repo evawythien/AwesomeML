@@ -66,11 +66,7 @@ namespace AwesomeMachineLearning.Common
             Console.WriteLine($"************************************************************");
         }
 
-        public static void PrintRegressionFoldsAverageMetrics(string algorithmName,
-                                                          (RegressionEvaluator.Result metrics,
-                                                           ITransformer model,
-                                                           IDataView scoredTestData)[] crossValidationResults
-                                                         )
+        public static void PrintRegressionFoldsAverageMetrics(string algorithmName, (RegressionEvaluator.Result metrics, ITransformer model, IDataView scoredTestData)[] crossValidationResults)
         {
             var L1 = crossValidationResults.Select(r => r.metrics.L1);
             var L2 = crossValidationResults.Select(r => r.metrics.L2);
@@ -89,12 +85,7 @@ namespace AwesomeMachineLearning.Common
             Console.WriteLine($"*************************************************************************************************************");
         }
 
-        public static void PrintMulticlassClassificationFoldsAverageMetrics(
-                                         string algorithmName,
-                                         (MultiClassClassifierEvaluator.Result metrics,
-                                          ITransformer model,
-                                          IDataView scoredTestData)[] crossValResults
-                                                                           )
+        public static void PrintMulticlassClassificationFoldsAverageMetrics(string algorithmName, (MultiClassClassifierEvaluator.Result metrics, ITransformer model, IDataView scoredTestData)[] crossValResults)
         {
             var metricsInMultipleFolds = crossValResults.Select(r => r.metrics);
 
@@ -133,14 +124,13 @@ namespace AwesomeMachineLearning.Common
         {
             double average = values.Average();
             double sumOfSquaresOfDifferences = values.Select(val => (val - average) * (val - average)).Sum();
-            double standardDeviation = Math.Sqrt(sumOfSquaresOfDifferences / (values.Count() - 1));
-            return standardDeviation;
+
+            return Math.Sqrt(sumOfSquaresOfDifferences / (values.Count() - 1));
         }
 
         public static double CalculateConfidenceInterval95(IEnumerable<double> values)
         {
-            double confidenceInterval95 = 1.96 * CalculateStandardDeviation(values) / Math.Sqrt((values.Count() - 1));
-            return confidenceInterval95;
+            return 1.96 * CalculateStandardDeviation(values) / Math.Sqrt((values.Count() - 1));
         }
 
         public static void PrintClusteringMetrics(string name, ClusteringEvaluator.Result metrics)
@@ -156,8 +146,7 @@ namespace AwesomeMachineLearning.Common
         public static List<TObservation> PeekDataViewInConsole<TObservation>(MLContext mlContext, IDataView dataView, IEstimator<ITransformer> pipeline, int numberOfRows = 4)
             where TObservation : class, new()
         {
-            string msg = string.Format("Peek data in DataView: Showing {0} rows with the columns specified by TObservation class", numberOfRows.ToString());
-            ConsoleWriteHeader(msg);
+            ConsoleWriteHeader(string.Format("Peek data in DataView: Showing {0} rows with the columns specified by TObservation class", numberOfRows.ToString()));
 
             //https://github.com/dotnet/machinelearning/blob/master/docs/code/MlNetCookBook.md#how-do-i-look-at-the-intermediate-data
             var transformer = pipeline.Fit(dataView);
@@ -165,20 +154,13 @@ namespace AwesomeMachineLearning.Common
 
             // 'transformedData' is a 'promise' of data, lazy-loading. Let's actually read it.
             // Convert to an enumerable of user-defined type.
-            var someRows = transformedData.AsEnumerable<TObservation>(mlContext, reuseRowObject: false)
-                                           // Take the specified number of rows
-                                           .Take(numberOfRows)
-                                           // Convert to List
-                                           .ToList();
+            var someRows = transformedData.AsEnumerable<TObservation>(mlContext, reuseRowObject: false).Take(numberOfRows).ToList();
 
             someRows.ForEach(row =>
             {
-                string lineToPrint = "Row--> ";
+                string lineToPrint = "Row --> ";
 
-                var fieldsInRow = row.GetType().GetFields(BindingFlags.Instance |
-                                                          BindingFlags.Static |
-                                                          BindingFlags.NonPublic |
-                                                          BindingFlags.Public);
+                var fieldsInRow = row.GetType().GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
                 foreach (FieldInfo field in fieldsInRow)
                 {
                     lineToPrint += $"| {field.Name}: {field.GetValue(row)}";
@@ -191,15 +173,13 @@ namespace AwesomeMachineLearning.Common
 
         public static List<float[]> PeekVectorColumnDataInConsole(MLContext mlContext, string columnName, IDataView dataView, IEstimator<ITransformer> pipeline, int numberOfRows = 4)
         {
-            string msg = string.Format("Peek data in DataView: : Show {0} rows with just the '{1}' column", numberOfRows, columnName);
-            ConsoleWriteHeader(msg);
+            ConsoleWriteHeader(string.Format("Peek data in DataView: : Show {0} rows with just the '{1}' column", numberOfRows, columnName));
 
-            var transformer = pipeline.Fit(dataView);
+            ITransformer transformer = pipeline.Fit(dataView);
             var transformedData = transformer.Transform(dataView);
 
             // Extract the 'Features' column.
-            var someColumnData = transformedData.GetColumn<float[]>(mlContext, columnName)
-                                                        .Take(numberOfRows).ToList();
+            var someColumnData = transformedData.GetColumn<float[]>(mlContext, columnName).Take(numberOfRows).ToList();
 
             // print to console the peeked rows
             someColumnData.ForEach(row =>
@@ -217,35 +197,40 @@ namespace AwesomeMachineLearning.Common
 
         public static void ConsoleWriteHeader(params string[] lines)
         {
-            var defaultColor = Console.ForegroundColor;
+            ConsoleColor defaultColor = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine(" ");
+
             foreach (var line in lines)
             {
                 Console.WriteLine(line);
             }
-            var maxLength = lines.Select(x => x.Length).Max();
+
+            int maxLength = lines.Select(x => x.Length).Max();
             Console.WriteLine(new string('#', maxLength));
             Console.ForegroundColor = defaultColor;
         }
 
         public static void ConsoleWriterSection(params string[] lines)
         {
-            var defaultColor = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Blue;
             Console.WriteLine(" ");
+
             foreach (var line in lines)
             {
                 Console.WriteLine(line);
             }
-            var maxLength = lines.Select(x => x.Length).Max();
-            Console.WriteLine(new string('-', maxLength));
-            Console.ForegroundColor = defaultColor;
+
+
+            Console.WriteLine(new string('-', lines.Select(x => x.Length).Max()));
+            Console.ForegroundColor = Console.ForegroundColor;
         }
 
         public static void ConsolePressAnyKey()
         {
-            var defaultColor = Console.ForegroundColor;
+            ConsoleColor defaultColor = Console.ForegroundColor;
+            defaultColor = Console.ForegroundColor;
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine(" ");
             Console.WriteLine("Press any key to finish.");
@@ -254,13 +239,15 @@ namespace AwesomeMachineLearning.Common
 
         public static void ConsoleWriteException(params string[] lines)
         {
-            var defaultColor = Console.ForegroundColor;
+            ConsoleColor defaultColor = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Red;
+
             const string exceptionTitle = "EXCEPTION";
             Console.WriteLine(" ");
             Console.WriteLine(exceptionTitle);
             Console.WriteLine(new string('#', exceptionTitle.Length));
             Console.ForegroundColor = defaultColor;
+
             foreach (var line in lines)
             {
                 Console.WriteLine(line);
@@ -269,13 +256,16 @@ namespace AwesomeMachineLearning.Common
 
         public static void ConsoleWriteWarning(params string[] lines)
         {
-            var defaultColor = Console.ForegroundColor;
+            ConsoleColor defaultColor = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.DarkMagenta;
+
             const string warningTitle = "WARNING";
+
             Console.WriteLine(" ");
             Console.WriteLine(warningTitle);
             Console.WriteLine(new string('#', warningTitle.Length));
             Console.ForegroundColor = defaultColor;
+
             foreach (var line in lines)
             {
                 Console.WriteLine(line);

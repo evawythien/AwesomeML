@@ -12,7 +12,7 @@
 
   <ItemGroup>
     <Folder Include="Data\" />
-    <Folder Include="MLModels\" />
+    <Folder Include="bin\Debug\netcoreapp2.1\MLModels\" />
     <None Update="Data\wikipedia-detox-250-line-data.tsv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

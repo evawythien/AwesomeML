@@ -18,11 +18,11 @@ namespace AwesomeMachineLearning
     {
         private static string AppPath => Path.GetDirectoryName(Environment.GetCommandLineArgs()[0]);
 
-        private static string BaseDatasetsLocation = @"../../../../Data";
+        private static string BaseDatasetsLocation = @"Data";
         private static string TrainDataPath = $"{BaseDatasetsLocation}/wikipedia-detox-250-line-data.tsv";
         private static string TestDataPath = $"{BaseDatasetsLocation}/wikipedia-detox-250-line-test.tsv";
 
-        private static string BaseModelsPath = @"../../../../MLModels";
+        private static string BaseModelsPath = @"MLModels";
         private static string ModelPath = $"{BaseModelsPath}/SentimentModel.zip";
 
         static void Main(string[] args)
@@ -50,11 +50,7 @@ namespace AwesomeMachineLearning
             {
                 Separator = "tab",
                 HasHeader = true,
-                Column = new[]
-                                                                    {
-                                                                    new TextLoader.Column("Label", DataKind.Bool, 0),
-                                                                    new TextLoader.Column("Text", DataKind.Text, 1)
-                                                                    }
+                Column = new[] { new TextLoader.Column("Label", DataKind.Bool, 0), new TextLoader.Column("Text", DataKind.Text, 1) }
             });
 
             IDataView trainingDataView = textLoader.Read(TrainDataPath);
@@ -95,7 +91,6 @@ namespace AwesomeMachineLearning
         // (OPTIONAL) Try/test a single prediction by loding the model from the file, first.
         private static void TestSinglePrediction(MLContext mlContext)
         {
-
             SentimentIssue sampleStatement = new SentimentIssue { Text = "This is a very rude movie" };
 
             ITransformer trainedModel;
@@ -118,7 +113,6 @@ namespace AwesomeMachineLearning
             Console.WriteLine($"=============== Single Prediction  ===============");
             Console.WriteLine($"Text: {sampleStatement.Text} | Prediction: {(Convert.ToBoolean(resultprediction.Prediction) ? "Toxic" : "Nice")} sentiment | Probability: {resultprediction.Probability} ");
             Console.WriteLine($"==================================================");
-            //
         }
     }
 }

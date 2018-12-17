@@ -1,10 +1,9 @@
-﻿using Microsoft.ML.Runtime.Api;
-
-namespace AwesomeMachineLearning.DataStructures
+﻿namespace AwesomeMachineLearning.DataStructures
 {
     public class SentimentIssue
     {
         public bool Label { get; set; }
+
         public string Text { get; set; }
     }
 }
